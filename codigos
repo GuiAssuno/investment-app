@@ -1,0 +1,972 @@
+// ============================================================================
+// 📁 frontend/package.json
+// ============================================================================
+{
+  "name": "investment-app-frontend",
+  "version": "1.0.0",
+  "description": "App de Investimentos B3 - Desktop",
+  "main": "src/main/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "build": "vite build && electron-builder",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "@reduxjs/toolkit": "^2.0.0",
+    "react-redux": "^9.0.0",
+    "socket.io-client": "^4.6.0",
+    "lightweight-charts": "^4.1.0",
+    "recharts": "^2.10.0",
+    "d3": "^7.8.0",
+    "axios": "^1.6.0",
+    "react-hook-form": "^7.48.0",
+    "zod": "^3.22.0",
+    "@hookform/resolvers": "^3.3.0",
+    "lucide-react": "^0.294.0",
+    "date-fns": "^2.30.0",
+    "numeral": "^2.0.6",
+    "@tanstack/react-table": "^8.10.0",
+    "sonner": "^1.2.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.0",
+    "vite": "^5.0.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "tailwindcss": "^3.3.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "concurrently": "^8.2.0",
+    "wait-on": "^7.2.0"
+  }
+}
+
+
+// ============================================================================
+// 📁 frontend/src/main/main.js - Processo Principal do Electron
+// ============================================================================
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+
+let mainWindow;
+
+function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1600,
+    height: 1000,
+    minWidth: 1200,
+    minHeight: 700,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js'),
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false
+    },
+    frame: true,
+    titleBarStyle: 'default',
+    backgroundColor: '#0a0a0a'
+  });
+
+  // Desenvolvimento
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.webContents.openDevTools();
+  } else {
+    // Produção
+    mainWindow.loadFile(path.join(__dirname, '../../dist/index.html'));
+  }
+
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
+app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
+});
+
+// IPC Handlers
+ipcMain.handle('app:getVersion', () => {
+  return app.getVersion();
+});
+
+ipcMain.handle('app:getPath', (event, name) => {
+  return app.getPath(name);
+});
+
+
+// ============================================================================
+// 📁 frontend/src/preload/preload.js - Preload Script
+// ============================================================================
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  getPath: (name) => ipcRenderer.invoke('app:getPath', name),
+});
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/index.jsx - Entry Point React
+// ============================================================================
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { Provider } from 'react-redux';
+import { BrowserRouter } from 'react-router-dom';
+import { store } from './store/store';
+import App from './App';
+import './styles/global.css';
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <Provider store={store}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </Provider>
+  </React.StrictMode>
+);
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/App.jsx - Componente Principal
+// ============================================================================
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
+import { Toaster } from 'sonner';
+
+// Pages
+import Login from './pages/auth/Login';
+import Dashboard from './pages/dashboard/Dashboard';
+import TradingDesk from './pages/trading/TradingDesk';
+import Portfolio from './pages/portfolio/Portfolio';
+import MarketAnalysis from './pages/analysis/MarketAnalysis';
+import Settings from './pages/settings/Settings';
+
+// Services
+import { initializeWebSocket } from './services/websocket/websocket';
+import { checkAuthStatus } from './store/slices/authSlice';
+
+function App() {
+  const dispatch = useDispatch();
+  const { isAuthenticated, isLoading } = useSelector((state) => state.auth);
+
+  useEffect(() => {
+    dispatch(checkAuthStatus());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      initializeWebSocket();
+    }
+  }, [isAuthenticated]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-900">
+        <div className="text-white text-xl">Carregando...</div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Toaster position="top-right" richColors />
+      <Routes>
+        <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" />} />
+        
+        {isAuthenticated ? (
+          <>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/trading" element={<TradingDesk />} />
+            <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/analysis" element={<MarketAnalysis />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/dashboard" />} />
+          </>
+        ) : (
+          <Route path="*" element={<Navigate to="/login" />} />
+        )}
+      </Routes>
+    </>
+  );
+}
+
+export default App;
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/store/store.js - Redux Store
+// ============================================================================
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from './slices/authSlice';
+import marketReducer from './slices/marketSlice';
+import portfolioReducer from './slices/portfolioSlice';
+import ordersReducer from './slices/ordersSlice';
+import websocketMiddleware from './middleware/websocketMiddleware';
+
+export const store = configureStore({
+  reducer: {
+    auth: authReducer,
+    market: marketReducer,
+    portfolio: portfolioReducer,
+    orders: ordersReducer,
+  },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(websocketMiddleware),
+});
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/store/slices/authSlice.js
+// ============================================================================
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { authAPI } from '../../services/api/auth.api';
+
+export const login = createAsyncThunk(
+  'auth/login',
+  async ({ email, password }, { rejectWithValue }) => {
+    try {
+      const response = await authAPI.login(email, password);
+      localStorage.setItem('token', response.token);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || 'Erro ao fazer login');
+    }
+  }
+);
+
+export const checkAuthStatus = createAsyncThunk(
+  'auth/checkStatus',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return null;
+      
+      const response = await authAPI.validateToken(token);
+      return response;
+    } catch (error) {
+      localStorage.removeItem('token');
+      return rejectWithValue(error.response?.data);
+    }
+  }
+);
+
+const authSlice = createSlice({
+  name: 'auth',
+  initialState: {
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    isLoading: true,
+    error: null,
+  },
+  reducers: {
+    logout: (state) => {
+      state.user = null;
+      state.token = null;
+      state.isAuthenticated = false;
+      localStorage.removeItem('token');
+    },
+    clearError: (state) => {
+      state.error = null;
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(login.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(login.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.isAuthenticated = true;
+        state.user = action.payload.user;
+        state.token = action.payload.token;
+      })
+      .addCase(login.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+      .addCase(checkAuthStatus.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(checkAuthStatus.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (action.payload) {
+          state.isAuthenticated = true;
+          state.user = action.payload.user;
+          state.token = localStorage.getItem('token');
+        } else {
+          state.isAuthenticated = false;
+        }
+      })
+      .addCase(checkAuthStatus.rejected, (state) => {
+        state.isLoading = false;
+        state.isAuthenticated = false;
+      });
+  },
+});
+
+export const { logout, clearError } = authSlice.actions;
+export default authSlice.reducer;
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/store/slices/marketSlice.js
+// ============================================================================
+import { createSlice } from '@reduxjs/toolkit';
+
+const marketSlice = createSlice({
+  name: 'market',
+  initialState: {
+    tickers: {},
+    orderBook: {},
+    trades: [],
+    selectedSymbol: 'PETR4',
+    loading: false,
+  },
+  reducers: {
+    updateTicker: (state, action) => {
+      const { symbol, data } = action.payload;
+      state.tickers[symbol] = {
+        ...state.tickers[symbol],
+        ...data,
+        lastUpdate: Date.now(),
+      };
+    },
+    updateOrderBook: (state, action) => {
+      const { symbol, data } = action.payload;
+      state.orderBook[symbol] = data;
+    },
+    addTrade: (state, action) => {
+      state.trades.unshift(action.payload);
+      if (state.trades.length > 100) {
+        state.trades = state.trades.slice(0, 100);
+      }
+    },
+    setSelectedSymbol: (state, action) => {
+      state.selectedSymbol = action.payload;
+    },
+    clearMarketData: (state) => {
+      state.tickers = {};
+      state.orderBook = {};
+      state.trades = [];
+    },
+  },
+});
+
+export const {
+  updateTicker,
+  updateOrderBook,
+  addTrade,
+  setSelectedSymbol,
+  clearMarketData,
+} = marketSlice.actions;
+
+export default marketSlice.reducer;
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/store/slices/portfolioSlice.js
+// ============================================================================
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { portfolioAPI } from '../../services/api/portfolio.api';
+
+export const fetchPortfolio = createAsyncThunk(
+  'portfolio/fetch',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await portfolioAPI.getPortfolio();
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data);
+    }
+  }
+);
+
+const portfolioSlice = createSlice({
+  name: 'portfolio',
+  initialState: {
+    positions: [],
+    balance: 0,
+    totalValue: 0,
+    profitLoss: 0,
+    profitLossPercent: 0,
+    loading: false,
+    error: null,
+  },
+  reducers: {
+    updatePosition: (state, action) => {
+      const index = state.positions.findIndex(
+        (p) => p.symbol === action.payload.symbol
+      );
+      if (index !== -1) {
+        state.positions[index] = {
+          ...state.positions[index],
+          ...action.payload,
+        };
+      }
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchPortfolio.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(fetchPortfolio.fulfilled, (state, action) => {
+        state.loading = false;
+        state.positions = action.payload.positions;
+        state.balance = action.payload.balance;
+        state.totalValue = action.payload.totalValue;
+        state.profitLoss = action.payload.profitLoss;
+        state.profitLossPercent = action.payload.profitLossPercent;
+      })
+      .addCase(fetchPortfolio.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+  },
+});
+
+export const { updatePosition } = portfolioSlice.actions;
+export default portfolioSlice.reducer;
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/store/slices/ordersSlice.js
+// ============================================================================
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { tradingAPI } from '../../services/api/trading.api';
+
+export const placeOrder = createAsyncThunk(
+  'orders/place',
+  async (orderData, { rejectWithValue }) => {
+    try {
+      const response = await tradingAPI.placeOrder(orderData);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data);
+    }
+  }
+);
+
+export const fetchOrders = createAsyncThunk(
+  'orders/fetch',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await tradingAPI.getOrders();
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data);
+    }
+  }
+);
+
+const ordersSlice = createSlice({
+  name: 'orders',
+  initialState: {
+    activeOrders: [],
+    executedOrders: [],
+    loading: false,
+    error: null,
+  },
+  reducers: {
+    updateOrderStatus: (state, action) => {
+      const { orderId, status, ...updates } = action.payload;
+      
+      const activeIndex = state.activeOrders.findIndex(o => o.id === orderId);
+      if (activeIndex !== -1) {
+        if (status === 'EXECUTED' || status === 'CANCELLED') {
+          const order = state.activeOrders.splice(activeIndex, 1)[0];
+          state.executedOrders.unshift({ ...order, status, ...updates });
+        } else {
+          state.activeOrders[activeIndex] = {
+            ...state.activeOrders[activeIndex],
+            status,
+            ...updates,
+          };
+        }
+      }
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(placeOrder.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(placeOrder.fulfilled, (state, action) => {
+        state.loading = false;
+        state.activeOrders.unshift(action.payload);
+      })
+      .addCase(placeOrder.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchOrders.fulfilled, (state, action) => {
+        state.activeOrders = action.payload.active;
+        state.executedOrders = action.payload.executed;
+      });
+  },
+});
+
+export const { updateOrderStatus } = ordersSlice.actions;
+export default ordersSlice.reducer;
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/services/api/api.js - Base API
+// ============================================================================
+import axios from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor para adicionar token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor para tratar erros
+api.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/services/api/auth.api.js
+// ============================================================================
+import api from './api';
+
+export const authAPI = {
+  login: async (email, password) => {
+    return api.post('/auth/login', { email, password });
+  },
+
+  register: async (userData) => {
+    return api.post('/auth/register', userData);
+  },
+
+  validateToken: async (token) => {
+    return api.get('/auth/validate', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  },
+
+  logout: async () => {
+    return api.post('/auth/logout');
+  },
+
+  enable2FA: async () => {
+    return api.post('/auth/2fa/enable');
+  },
+
+  verify2FA: async (code) => {
+    return api.post('/auth/2fa/verify', { code });
+  },
+};
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/services/api/trading.api.js
+// ============================================================================
+import api from './api';
+
+export const tradingAPI = {
+  placeOrder: async (orderData) => {
+    return api.post('/trading/orders', orderData);
+  },
+
+  cancelOrder: async (orderId) => {
+    return api.delete(`/trading/orders/${orderId}`);
+  },
+
+  getOrders: async (filters = {}) => {
+    return api.get('/trading/orders', { params: filters });
+  },
+
+  getOrderById: async (orderId) => {
+    return api.get(`/trading/orders/${orderId}`);
+  },
+
+  modifyOrder: async (orderId, updates) => {
+    return api.patch(`/trading/orders/${orderId}`, updates);
+  },
+};
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/services/api/market.api.js
+// ============================================================================
+import api from './api';
+
+export const marketAPI = {
+  getTicker: async (symbol) => {
+    return api.get(`/market/ticker/${symbol}`);
+  },
+
+  getOrderBook: async (symbol) => {
+    return api.get(`/market/orderbook/${symbol}`);
+  },
+
+  getHistoricalData: async (symbol, interval, start, end) => {
+    return api.get(`/market/historical/${symbol}`, {
+      params: { interval, start, end },
+    });
+  },
+
+  searchSymbols: async (query) => {
+    return api.get('/market/search', { params: { q: query } });
+  },
+
+  getFundamentals: async (symbol) => {
+    return api.get(`/market/fundamentals/${symbol}`);
+  },
+};
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/services/api/portfolio.api.js
+// ============================================================================
+import api from './api';
+
+export const portfolioAPI = {
+  getPortfolio: async () => {
+    return api.get('/portfolio');
+  },
+
+  getPositions: async () => {
+    return api.get('/portfolio/positions');
+  },
+
+  getPerformance: async (period = '1M') => {
+    return api.get('/portfolio/performance', { params: { period } });
+  },
+
+  getTransactions: async (filters = {}) => {
+    return api.get('/portfolio/transactions', { params: filters });
+  },
+
+  exportReport: async (type, format = 'pdf') => {
+    return api.get(`/portfolio/reports/${type}`, {
+      params: { format },
+      responseType: 'blob',
+    });
+  },
+};
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/services/websocket/websocket.js
+// ============================================================================
+import io from 'socket.io-client';
+import { store } from '../../store/store';
+import { updateTicker, updateOrderBook, addTrade } from '../../store/slices/marketSlice';
+import { updateOrderStatus } from '../../store/slices/ordersSlice';
+import { updatePosition } from '../../store/slices/portfolioSlice';
+
+let socket = null;
+
+const WS_URL = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
+
+export const initializeWebSocket = () => {
+  if (socket) return socket;
+
+  const token = localStorage.getItem('token');
+  
+  socket = io(WS_URL, {
+    auth: { token },
+    transports: ['websocket'],
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionAttempts: 5,
+  });
+
+  socket.on('connect', () => {
+    console.log('✅ WebSocket conectado');
+  });
+
+  socket.on('disconnect', () => {
+    console.log('❌ WebSocket desconectado');
+  });
+
+  // Market Data
+  socket.on('ticker:update', (data) => {
+    store.dispatch(updateTicker(data));
+  });
+
+  socket.on('orderbook:update', (data) => {
+    store.dispatch(updateOrderBook(data));
+  });
+
+  socket.on('trade:new', (data) => {
+    store.dispatch(addTrade(data));
+  });
+
+  // Order Updates
+  socket.on('order:update', (data) => {
+    store.dispatch(updateOrderStatus(data));
+  });
+
+  // Portfolio Updates
+  socket.on('position:update', (data) => {
+    store.dispatch(updatePosition(data));
+  });
+
+  socket.on('error', (error) => {
+    console.error('WebSocket Error:', error);
+  });
+
+  return socket;
+};
+
+export const subscribeToSymbol = (symbol) => {
+  if (socket) {
+    socket.emit('subscribe', { symbol });
+  }
+};
+
+export const unsubscribeFromSymbol = (symbol) => {
+  if (socket) {
+    socket.emit('unsubscribe', { symbol });
+  }
+};
+
+export const disconnectWebSocket = () => {
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+};
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/hooks/useMarketData.js
+// ============================================================================
+import { useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { subscribeToSymbol, unsubscribeFromSymbol } from '../services/websocket/websocket';
+
+export const useMarketData = (symbol) => {
+  const dispatch = useDispatch();
+  const ticker = useSelector((state) => state.market.tickers[symbol]);
+  const orderBook = useSelector((state) => state.market.orderBook[symbol]);
+
+  useEffect(() => {
+    if (symbol) {
+      subscribeToSymbol(symbol);
+      return () => unsubscribeFromSymbol(symbol);
+    }
+  }, [symbol]);
+
+  return { ticker, orderBook };
+};
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/utils/formatters.js
+// ============================================================================
+import numeral from 'numeral';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+export const formatCurrency = (value) => {
+  return numeral(value).format('R$ 0,0.00');
+};
+
+export const formatPercent = (value) => {
+  return numeral(value / 100).format('0.00%');
+};
+
+export const formatNumber = (value, decimals = 2) => {
+  return numeral(value).format(`0,0.${'0'.repeat(decimals)}`);
+};
+
+export const formatDate = (date, formatStr = 'dd/MM/yyyy HH:mm') => {
+  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  return format(dateObj, formatStr, { locale: ptBR });
+};
+
+export const formatVolume = (volume) => {
+  if (volume >= 1000000) {
+    return `${(volume / 1000000).toFixed(1)}M`;
+  }
+  if (volume >= 1000) {
+    return `${(volume / 1000).toFixed(1)}K`;
+  }
+  return volume.toString();
+};
+
+
+// ============================================================================
+// 📁 frontend/tailwind.config.js
+// ============================================================================
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        background: '#0a0a0a',
+        foreground: '#ffffff',
+        primary: {
+          50: '#eff6ff',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+        },
+        success: {
+          500: '#22c55e',
+          600: '#16a34a',
+        },
+        danger: {
+          500: '#ef4444',
+          600: '#dc2626',
+        },
+      },
+    },
+  },
+  plugins: [],
+}
+
+
+// ============================================================================
+// 📁 frontend/src/renderer/styles/global.css
+// ============================================================================
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #0a0a0a;
+  color: #ffffff;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Scrollbar customizado */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Animações */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+
+// ============================================================================
+// 📁 frontend/vite.config.js
+// ============================================================================
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+
+export default defineConfig({
+  plugins: [react()],
+  base: './',
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src/renderer'),
+    },
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
+  build: {
+    outDir: 'dist',
+    emptyOutDir: true,
+  },
+});
+
+
+// ============================================================================
+// 📁 frontend/.env.example
+// ============================================================================
+VITE_API_URL=http://localhost:3001/api
+VITE_WS_URL=http://localhost:3001
