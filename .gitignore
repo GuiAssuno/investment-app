@@ -17,6 +17,9 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+/home/lola/VScode/investment-app/analytics-engine/venv
+/home/lola/VScode/investment-app/backend/node_modules
+/home/lola/VScode/investment-app/frontend/node_modules
 
 # Logs
 npm-debug.log*
