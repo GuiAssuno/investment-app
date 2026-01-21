@@ -1,49 +1,41 @@
+import os
+import shutil
+from selenium import webdriver
+from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.firefox.options import Options
+from webdriver_manager.firefox import GeckoDriverManager
 
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
+# 1. LIMPEZA DE TERRENO (Mata processos presos no Linux)
+os.system("pkill geckodriver")
+os.system("pkill firefox")
 
-caminho = "investment-app/busca/ativos.csv"
-ativos_df = pd.read_csv(caminho)
-sites = []
+# 2. PREPARANDO O TERRENO (Configuração Anti-Erro do Snap)
+# Cria uma pasta local para o perfil, fugindo da pasta /tmp bloqueada
+caminho_perfil = os.path.abspath("perfil_firefox_temp")
+if not os.path.exists(caminho_perfil):
+    os.makedirs(caminho_perfil)
 
-def coletar_dados_site(url, tag_alvo, classe_alvo,df=ativos_df[0]):
-    print(f"Iniciando a coleta de dados da URL: {url}")
+options = Options()
+# Diz para o Firefox usar essa pasta liberada
+options.add_argument("-profile")
+options.add_argument(caminho_perfil)
+
+# Se precisar, descomente a linha abaixo para apontar onde o Firefox está instalado
+# options.binary_location = "/snap/bin/firefox" 
+
+# 3. INICIANDO
+try:
+    print("Tentando iniciar o Firefox...")
+    servico = Service(GeckoDriverManager().install())
     
-    # Lista para armazenar os dados coletados
-    dados_coletados = []
+    # O SEGREDO ESTÁ AQUI: Passar 'options=options'
+    driver = webdriver.Firefox(service=servico, options=options)
+    
+    print("Navegador aberto com sucesso!")
 
-    try:
+    # --- SEU CÓDIGO DE EXTRAÇÃO CONTINUA AQUI EMBAIXO ---
+    # ... cole a parte do driver.get(...) aqui ...
 
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        # Verifica se a requisição foi bem-sucedida (código 200)
-        response.raise_for_status() 
-        print("Página baixada com sucesso!")
-
-        # 2. ANALISAR O CONTEÚDO HTML
-        site = BeautifulSoup(response.text, 'lxml')
-        print("HTML analisado. Procurando pelos dados...")
-
-        # 3. LOCALIZAR OS DADOS
-        # Encontra TODOS os elementos que correspondem à tag e classe fornecidas.
-        elementos_encontrados = site.find_all(tag_alvo, class_=classe_alvo)
-        
-        if not elementos_encontrados:
-            print(f"Atenção: Nenhum elemento encontrado com a tag '{tag_alvo}' e classe '{classe_alvo}'. Verifique o site.")
-            return []
-    except Exception as e:
-        print(f"Ocorreu um erro durante a requisição ou análise do site: {e}")
-        return []
-
-
-#============================  M A I N ====================================
-
-url_alvo = ""
-tag = 'div'            
-classe = 'col-md-8'   #quesquisando no google MDTDab
-
-dados_brutos = coletar_dados_site(url_alvo, tag, classe)
-print(len(dados_brutos))
-
+except Exception as e:
+    print(f"\nERRO CRÍTICO: {e}")
+    print("Dica: Se o erro persistir, tente reiniciar o computador para limpar a memória.")
