@@ -55,7 +55,7 @@ def extrair_dados(cota, lista_negra=((pathlib.Path(__file__).parent.resolve()) /
         time.sleep(4) 
 
         texto_pagina = driver.find_element(By.TAG_NAME, "body").text
-        linhas = texto_pagina.replace(',','.').replace(' Today','').replace('%','').replace('R$ ','').split('\n')
+        linhas = texto_pagina.replace(',','.').replace(' Today','').replace('%','').replace('R$','').split('\n')
         
         if len(linhas) > 36:
             dado_linha_34 = linhas[34]
