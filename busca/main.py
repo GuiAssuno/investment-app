@@ -1,9 +1,14 @@
 import cota as ct
 import pandas as pd
 import time
+import os
+from concurrent.futures import ThreadPoolExecutor
+
 
 caminho_csv = 'investment-app/busca/ativos.csv'
 simbolos, nomes = ct.ativos(caminho_csv)
+qtd_workers = 6
+inicio = time.time()
 
 dados_ativo = {
         "simbolo": [],
@@ -11,7 +16,22 @@ dados_ativo = {
         "variação": [],
         "variação_porcentagem": [],
         "horario": []}
+with ThreadPoolExecutor(max_workers=qtd_workers) as executor:
+    resultados = list(executor.map(ct.extrair_dados, simbolos))
 
+print(resultados)
+print(type(resultados))
+
+print("\n" + "="*30)
+for linha in resultados:
+    print(linha)
+print("="*30)
+
+print(f"\nTempo total: {time.time() - inicio:.2f} segundos")
+
+
+
+'''  
 for simbulo in simbolos:
     preco, variacao, variacao_porcentagem = ct.extrair_dados(simbulo)
     dados_ativo["simbolo"].append(simbulo)
@@ -27,3 +47,6 @@ with open (f'investment-app/busca/dado-do-dia/precos-{hora}.csv', 'a') as f:
     f.write('ID,Preço,Variação,Variação (%),Horário\n')
     for i in range (len(dados_ativo['simbolo'])):
         f.write(f"{dados_ativo['simbolo'][i]},{dados_ativo['preço'][i]},{dados_ativo['variação'][i]},{dados_ativo['variação_porcentagem'][i]},{dados_ativo['horario'][i]}\n")
+        
+        
+'''  
