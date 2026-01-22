@@ -4,31 +4,34 @@ import time
 import os
 from concurrent.futures import ThreadPoolExecutor
 
-
 caminho_csv = 'investment-app/busca/ativos.csv'
 simbolos, nomes = ct.ativos(caminho_csv)
 qtd_workers = 6
 inicio = time.time()
-
 dados_ativo = {
         "simbolo": [],
         "preço": [],
         "variação": [],
         "variação_porcentagem": [],
         "horario": []}
-with ThreadPoolExecutor(max_workers=qtd_workers) as executor:
-    resultados = list(executor.map(ct.extrair_dados, simbolos))
+conta = True
 
-print(resultados)
-print(type(resultados))
+while conta:
 
-print("\n" + "="*30)
-for linha in resultados:
-    print(linha)
-print("="*30)
+    with ThreadPoolExecutor(max_workers=qtd_workers) as executor:
+        resultados = list(executor.map(ct.extrair_dados, simbolos))
 
-print(f"\nTempo total: {time.time() - inicio:.2f} segundos")
+    print(resultados)
+    print(type(resultados))
 
+    print("\n" + "="*30)
+    for linha in resultados:
+        print(linha)
+    print("="*30)
+
+    print(f"\nTempo total: {time.time() - inicio:.2f} segundos")
+
+    conta = False
 
 
 '''  
