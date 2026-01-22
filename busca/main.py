@@ -1,5 +1,6 @@
 import cota as ct
 import pandas as pd
+import time
 
 caminho_csv = 'investment-app/busca/ativos.csv'
 simbolos, nomes = ct.ativos(caminho_csv)
@@ -18,7 +19,7 @@ for simbulo in simbolos:
     dados_ativo["variação"].append(variacao)
     dados_ativo["variação_porcentagem"].append(variacao_porcentagem)
     dados_ativo["horario"].append(pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))
-    
+    time.sleep(2)
 
 hora = pd.Timestamp.now().strftime('%Y_%m_%d_%H-%M-%S')
 

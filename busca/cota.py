@@ -1,6 +1,7 @@
 import time
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 import pandas as pd
@@ -11,6 +12,21 @@ def ativos(caminho_csv):
     return list(df['id']), list(df['Nome'])
 
 def extrair_dados(cota):
+    # 1. CRIANDO AS OPÇÕES
+    chrome_options = Options()
+
+    # -- O COMANDO MÁGICO --
+    # "--headless=new" é a versão moderna e mais estável do modo invisível
+    chrome_options.add_argument("--headless=new") 
+
+    # DICA DE OURO: No modo headless, o site as vezes abre pequeno (800x600)
+    # e esconde dados. Forçamos o tamanho Full HD para garantir que tudo apareça.
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    # 2. INICIANDO COM AS OPÇÕES
+    servico = Service(ChromeDriverManager().install())
+    # Passamos options=chrome_options aqui
+    driver = webdriver.Chrome(service=servico, options=chrome_options)
     # Inicializa o Chrome
     servico = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=servico)
