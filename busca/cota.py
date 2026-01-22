@@ -1,7 +1,7 @@
 import os
 import time
 import secrets
-from unicodedata import numeric
+import pathlib
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -14,7 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 def ativos(caminho_csv):
 
     try:
-        df_negra = pd.read_csv('investment-app/busca/lista-negra.csv')
+        df_negra = pd.read_csv((pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv')
         lista_negra = list(df_negra)
     except FileNotFoundError:
         lista_negra = []
@@ -23,6 +23,14 @@ def ativos(caminho_csv):
     df = df[ ~df['id'].isin(lista_negra) ]
 
     return list(df['id']), list(df['Nome'])
+
+def isnumeric(s):
+    """Verifica se uma string é numérica"""
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
 
 def configurar_driver():
     """Configura o Chrome para rodar leve"""
@@ -38,7 +46,7 @@ def configurar_driver():
     servico = Service(ChromeDriverManager().install())
     return webdriver.Chrome(service=servico, options=chrome_options)
 
-def extrair_dados(cota, lista_negra='investment-app/busca/lista-negra.csv'):
+def extrair_dados(cota, lista_negra=((pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv')):
 
     driver = configurar_driver()
     try:
@@ -47,14 +55,14 @@ def extrair_dados(cota, lista_negra='investment-app/busca/lista-negra.csv'):
         time.sleep(4) 
 
         texto_pagina = driver.find_element(By.TAG_NAME, "body").text
-        linhas = texto_pagina.replace(',','.').replace(' Hoje','').replace('%','').replace('R$ ','').split('\n')
+        linhas = texto_pagina.replace(',','.').replace(' Today','').replace('%','').replace('R$ ','').split('\n')
         
         if len(linhas) > 36:
             dado_linha_34 = linhas[34]
             dado_linha_35 = linhas[35]
             dado_linha_36 = linhas[36]
-            
-            if (dado_linha_35 == '0' or ( not numeric(float(dado_linha_35)))) and (dado_linha_36 == '0'):
+
+            if (dado_linha_35 == '0' or (not isnumeric(dado_linha_35))) and (dado_linha_36 == '0'):
                 with open(lista_negra, 'a') as f:
                     f.write(f"{cota}\n")
 
@@ -88,7 +96,7 @@ def teste_extrair_dados(cota):
 def salvar_dados(dados_ativo):
     hora = pd.Timestamp.now().strftime('%Y_%m_%d_%H-%M-%S')
 
-    with open (f'investment-app/busca/dado-do-dia/precos-{hora}.csv', 'a') as f:
+    with open (f'{(pathlib.Path(__file__).parent.resolve())}/dado-do-dia/{hora}.csv', 'a') as f:
         f.write('ID,Preço,Variação,Variação (%),Horário\n')
         for i in range (len(dados_ativo['simbolo'])):
             f.write(f"{dados_ativo['simbolo'][i]},{dados_ativo['preço'][i]},{dados_ativo['variação'][i]},{dados_ativo['variação_porcentagem'][i]},{dados_ativo['horario'][i]}\n")
@@ -102,12 +110,12 @@ def iniciar_extracao(caminho_csv, qtd_workers = 2):
         "variação_porcentagem": [],
         "horario": []}
 
-    if os.name != 'nt':
+    if os.name == 'nt':
         
         inicio = time.time()
 
         with ThreadPoolExecutor(max_workers=qtd_workers) as executor:
-            resultados = list(executor.map(extrair_dados, simbolos[:10]))
+            resultados = list(executor.map(extrair_dados, simbolos))
 
 
         for linha, simbolo in zip(resultados, simbolos):
@@ -134,4 +142,4 @@ def iniciar_extracao(caminho_csv, qtd_workers = 2):
             dados_ativo["horario"].append(pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))
             time.sleep(2)
         
-        salvar_dados(dados_ativo, lista_negra)
+        salvar_dados(dados_ativo)
