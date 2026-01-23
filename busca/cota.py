@@ -12,7 +12,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 
 def ativos(caminho_csv):
-
+    lista_teste_negra = ['NORD3','OIBR3','OSXB3','PEAB3','REDE3','RRIOS','RPAD3','RSID3','SNSY3','SOND3','TKNO3','TRIS3','VVAR3','TOTS3','WIZS3']
+    
     try:
         df_negra = pd.read_csv((pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv')
         lista_negra = list(df_negra)
@@ -22,8 +23,24 @@ def ativos(caminho_csv):
     df = pd.read_csv(caminho_csv)
     df = df[ ~df['id'].isin(lista_negra) ]
 
-    return list(df['id']), list(df['Nome'])
+    return lista_teste_negra, list(df['Nome'])
 
+def lista_negra(caminho_arquivo, cota):
+    ja_existe = False
+
+    if os.path.exists(caminho_arquivo):
+        with open(caminho_arquivo, 'r') as f:
+            conteudo = f.read()
+            if cota in conteudo:
+                ja_existe = True
+            print(f"O ativo {cota} já estava na lista negra. Não fiz nada.")
+    # 2. Só escreve se não existir
+    
+    if not ja_existe:
+        with open(caminho_arquivo, 'a') as f:
+            f.write(f"{cota}\n")
+            print(f"Sucesso! {cota} adicionado à lista negra.")
+            
 def isnumeric(s):
     """Verifica se uma string é numérica"""
     try:
@@ -46,40 +63,37 @@ def configurar_driver():
     servico = Service(ChromeDriverManager().install())
     return webdriver.Chrome(service=servico, options=chrome_options)
 
-def extrair_dados(cota, lista_negra=((pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv')):
+def extrair_dados(cota):
 
     driver = configurar_driver()
     try:
         driver.get(f"https://www.google.com/finance/quote/{cota}:BVMF")
-        
         time.sleep(4) 
 
         texto_pagina = driver.find_element(By.TAG_NAME, "body").text
         linhas = texto_pagina.replace(',','.').replace(' Today','').replace('%','').replace('R$','').split('\n')
         
-        if len(linhas) > 36:
-            dado_linha_34 = linhas[34]
-            dado_linha_35 = linhas[35]
-            dado_linha_36 = linhas[36]
+        dado_linha_34 = linhas[34]
+        dado_linha_35 = linhas[35]
+        dado_linha_36 = linhas[36]
 
-            if (dado_linha_35 == '0' or (not isnumeric(dado_linha_35))) and (dado_linha_36 == '0'):
-                with open(lista_negra, 'a') as f:
-                    f.write(f"{cota}\n")
+        c1 = (dado_linha_35 == '0' or (not isnumeric(dado_linha_35)))
+        c2 = ((dado_linha_36 == '0') or (not isnumeric(dado_linha_36)))
 
-
-            print("\n" + "="*10)
-            print(f"  {cota}  ")
-            print("="*10)
-            print(f"R$ {dado_linha_34}")
-            print(f"   {dado_linha_35}")
-            print(f"  {dado_linha_36}")
-            print("="*10 + "\n")
-            
-            return dado_linha_34, dado_linha_36, dado_linha_35
-
-        else:
-            print("Ops! A página carregou menos linhas do que o esperado. Tente rodar o 'Raio-X' novamente.")
+        if c1 and c2:
+            lista_negra(((pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv'), cota)
             return None, None, None
+        
+        print("\n" + "="*10)
+        print(f"  {cota}  ")
+        print("="*10)
+        print(f"R$ {dado_linha_34}")
+        print(f"   {dado_linha_35}")
+        print(f"  {dado_linha_36}")
+        print("="*10 + "\n")
+
+        return dado_linha_34, dado_linha_36, dado_linha_35    
+            
     except Exception as e:
         print(f"Erro: {e}")
         return None, None, None
@@ -101,7 +115,7 @@ def salvar_dados(dados_ativo):
         for i in range (len(dados_ativo['simbolo'])):
             f.write(f"{dados_ativo['simbolo'][i]},{dados_ativo['preço'][i]},{dados_ativo['variação'][i]},{dados_ativo['variação_porcentagem'][i]},{dados_ativo['horario'][i]}\n")
 
-def iniciar_extracao(caminho_csv, qtd_workers = 2):
+def iniciar_extracao(caminho_csv, qtd_workers):
     simbolos, nomes = ativos(caminho_csv)
     dados_ativo = {
         "simbolo": [],
@@ -117,14 +131,21 @@ def iniciar_extracao(caminho_csv, qtd_workers = 2):
         with ThreadPoolExecutor(max_workers=qtd_workers) as executor:
             resultados = list(executor.map(extrair_dados, simbolos))
 
-
-        for linha, simbolo in zip(resultados, simbolos):
-            dados_ativo["simbolo"].append(simbolo)
-            dados_ativo["preço"].append(linha[0])
-            dados_ativo["variação"].append(linha[2])
-            dados_ativo["variação_porcentagem"].append(linha[1])
-            dados_ativo["horario"].append(pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))
-        
+        try:
+            resultados.remove((None, None, None))
+            print(f"\n{resultados.remove((None, None, None))}\n")
+            if len(resultados) == 0:
+                raise ValueError("Nenhum dado válido foi extraído.")
+            else:
+                for linha, simbolo in (resultados, simbolos):
+                    dados_ativo["simbolo"].append(simbolo)
+                    dados_ativo["preco"].append(linha[0])
+                    dados_ativo["variacao"].append(linha[2])
+                    dados_ativo["variacao_porcentagem"].append(linha[1])
+                    dados_ativo["horario"].append(pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))
+        except ValueError:
+            print("Nenhum dado válido foi extraído.")
+    
         print("="*30)
 
         print(f"\nTempo total: {time.time() - inicio:.2f} segundos")
