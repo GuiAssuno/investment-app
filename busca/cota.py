@@ -9,37 +9,51 @@ from concurrent.futures import ThreadPoolExecutor
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-
+import interface
 
 def ativos(caminho_csv):
-    lista_teste_negra = ['NORD3','OIBR3','OSXB3','PEAB3','REDE3','RRIOS','RPAD3','RSID3','SNSY3','SOND3','TKNO3','TRIS3','VVAR3','TOTS3','WIZS3']
-    
+    #lista_teste_negra = ['NORD3','OIBR3','OSXB3','PEAB3','REDE3','RRIOS','RPAD3','RSID3','SNSY3','SOND3','TKNO3','TRIS3','VVAR3','TOTS3','WIZS3']
+    path = (pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv'
+    print("Caminho lista negra:", caminho_csv)
     try:
-        df_negra = pd.read_csv((pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv')
+        df_negra = pd.read_csv(path)
         lista_negra = list(df_negra)
-    except FileNotFoundError:
+    except Exception as e:
+        print("Erro no carregamento da lista negra:", {e})
         lista_negra = []
+        pass
+    
+    print("Carregando ativos do CSV...")
 
-    df = pd.read_csv(caminho_csv)
-    df = df[ ~df['id'].isin(lista_negra) ]
-
-    return lista_teste_negra, list(df['Nome'])
+    try:
+        df = pd.read_csv(caminho_csv)
+        if lista_negra != []:
+            df = df[ ~df['id'].isin(lista_negra) ]
+        print(f"Ativos na lista negra: {len(df['id'])}")
+        return list(df['id']), list(df['Nome'])
+    except KeyError as e:
+        print("ERRO:", e)
 
 def lista_negra(caminho_arquivo, cota):
     ja_existe = False
-
-    if os.path.exists(caminho_arquivo):
-        with open(caminho_arquivo, 'r') as f:
-            conteudo = f.read()
-            if cota in conteudo:
-                ja_existe = True
-            print(f"O ativo {cota} já estava na lista negra. Não fiz nada.")
-    # 2. Só escreve se não existir
+    try:
+        if os.path.exists(caminho_arquivo):
+            with open(caminho_arquivo, 'r') as f:
+                conteudo = f.read()
+                if cota in conteudo:
+                    ja_existe = True
+                print(f"O ativo {cota} já estava na lista negra. Não fiz nada.")
+    except Exception as e:
+        print("Erro ao verificar lista negra: ", e)
+        return
     
-    if not ja_existe:
-        with open(caminho_arquivo, 'a') as f:
-            f.write(f"{cota}\n")
-            print(f"Sucesso! {cota} adicionado à lista negra.")
+    try:
+        if not ja_existe:
+            with open(caminho_arquivo, 'a') as f:
+                f.write(f"{cota}\n")
+                print(f"Sucesso! {cota} adicionado à lista negra.")
+    except Exception as e:
+        print("Erro ao adicionar à lista negra: ", e)
             
 def isnumeric(s):
     """Verifica se uma string é numérica"""
@@ -69,20 +83,32 @@ def extrair_dados(cota):
     try:
         driver.get(f"https://www.google.com/finance/quote/{cota}:BVMF")
         time.sleep(4) 
+        if os.name == 'nt':
+            ls = 'Today' #meu sistema é em inglês no windowns
+        else:
+            ls = 'Hoje' #meu sistema é em português no linux
+
 
         texto_pagina = driver.find_element(By.TAG_NAME, "body").text
-        linhas = texto_pagina.replace(',','.').replace(' Today','').replace('%','').replace('R$','').split('\n')
+        linhas = texto_pagina.replace(',','.').replace(f' {ls}','').replace('%','').replace('R$','').split('\n')
         
         dado_linha_34 = linhas[34]
         dado_linha_35 = linhas[35]
         dado_linha_36 = linhas[36]
-
-        c1 = (dado_linha_35 == '0' or (not isnumeric(dado_linha_35)))
-        c2 = ((dado_linha_36 == '0') or (not isnumeric(dado_linha_36)))
-
-        if c1 and c2:
-            lista_negra(((pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv'), cota)
-            return
+        print(f"DADOS EXTRAÍDOS DA {cota}: {dado_linha_34}, {dado_linha_35}, {dado_linha_36}")
+        try:
+            c1 = (dado_linha_35 == '0.00' or (not isnumeric(dado_linha_35)))
+            c2 = (dado_linha_36 == '0.00' or (not isnumeric(dado_linha_36)))
+        except KeyError as e:
+            print("Erro ao verificar condições: ", e)
+        
+        try:
+            if c1 and c2:
+                lista_negra(((pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv'), cota)
+                
+                return
+        except KeyError as e:
+            print("Erro ao adicionar à lista negra: ", e)
         
         print("\n" + "="*10)
         print(f"  {cota}  ")
@@ -94,7 +120,7 @@ def extrair_dados(cota):
 
         return dado_linha_34, dado_linha_36, dado_linha_35    
             
-    except Exception as e:
+    except KeyError as e:
         print(f"Erro: {e}")
         return None, None, None
     finally:
@@ -116,13 +142,19 @@ def salvar_dados(dados_ativo):
             f.write(f"{dados_ativo['simbolo'][i]},{dados_ativo['preço'][i]},{dados_ativo['variação'][i]},{dados_ativo['variação_porcentagem'][i]},{dados_ativo['horario'][i]}\n")
 
 def iniciar_extracao(caminho_csv, qtd_workers):
-    simbolos, nomes = ativos(caminho_csv)
-    dados_ativo = {
-        "simbolo": [],
-        "preço": [],
-        "variação": [],
-        "variação_porcentagem": [],
-        "horario": []}
+    try:
+        print("Carregando ativos...")
+        simbolos, nomes = ativos(caminho_csv)
+        print(f"Total de ativos para extrair: {len(simbolos)}")
+        dados_ativo = {
+            "simbolo": [],
+            "preço": [],
+            "variação": [],
+            "variação_porcentagem": [],
+            "horario": []}
+    except Exception as e:
+        print(f"Erro ao carregar ativos: {e}")
+        return
 
     if os.name == 'nt':
         
@@ -161,14 +193,31 @@ def iniciar_extracao(caminho_csv, qtd_workers):
     else:
 
         try:
+            progress = len(simbolos)
+            carregar = interface.Main()
+            print("Iniciando extração sequencial...")
             for simbolo in simbolos:
-                preco, variacao, variacao_porcentagem = extrair_dados(simbolo)
+                print(f"Extraindo dados para {simbolo}...")
+                resultado = extrair_dados(simbolo)
+                if resultado == None:
+                    print(f"Dados inválidos para {simbolo}, pulando...")
+                    continue
+                preco, variacao, variacao_porcentagem = resultado
                 dados_ativo["simbolo"].append(simbolo)
                 dados_ativo["preço"].append(preco)
                 dados_ativo["variação"].append(variacao)
                 dados_ativo["variação_porcentagem"].append(variacao_porcentagem)
                 dados_ativo["horario"].append(pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))
+                carregar.prograss["value"] += (100 / progress)
+                carregar.update_idletasks()
+                progress -= 1
                 time.sleep(2)
         except Exception as e:
             print(f"Erro durante a extração: {e}")    
         salvar_dados(dados_ativo)
+
+
+if __name__ == "__main__":
+    caminho_csv = pathlib.Path(__file__).parent.resolve()
+    caminho_csv = caminho_csv / 'ativos.csv'
+    iniciar_extracao(caminho_csv, qtd_workers=2)
