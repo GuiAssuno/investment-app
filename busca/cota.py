@@ -82,7 +82,7 @@ def extrair_dados(cota):
 
         if c1 and c2:
             lista_negra(((pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv'), cota)
-            return None, None, None
+            return
         
         print("\n" + "="*10)
         print(f"  {cota}  ")
@@ -132,12 +132,13 @@ def iniciar_extracao(caminho_csv, qtd_workers):
             resultados = list(executor.map(extrair_dados, simbolos))
 
         try:
-            resultados.remove((None, None, None))
-            print(f"\n{resultados.remove((None, None, None))}\n")
+            reresultados.remove((None, None, None))
             if len(resultados) == 0:
                 raise ValueError("Nenhum dado válido foi extraído.")
             else:
                 for linha, simbolo in (resultados, simbolos):
+                    if None in linha:
+                        continue
                     dados_ativo["simbolo"].append(simbolo)
                     dados_ativo["preco"].append(linha[0])
                     dados_ativo["variacao"].append(linha[2])
@@ -150,17 +151,24 @@ def iniciar_extracao(caminho_csv, qtd_workers):
 
         print(f"\nTempo total: {time.time() - inicio:.2f} segundos")
         
-        salvar_dados(dados_ativo)
-    
+        try:
+            if len(dados_ativo["simbolo"]) > 0:
+                salvar_dados(dados_ativo)
+            else:
+                print("Nenhum dado válido para salvar.")
+        except:
+            print("Erro ao salvar os dados.")
     else:
 
-        for simbolo in simbolos:
-            preco, variacao, variacao_porcentagem = extrair_dados(simbolo)
-            dados_ativo["simbolo"].append(simbolo)
-            dados_ativo["preço"].append(preco)
-            dados_ativo["variação"].append(variacao)
-            dados_ativo["variação_porcentagem"].append(variacao_porcentagem)
-            dados_ativo["horario"].append(pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))
-            time.sleep(2)
-        
+        try:
+            for simbolo in simbolos:
+                preco, variacao, variacao_porcentagem = extrair_dados(simbolo)
+                dados_ativo["simbolo"].append(simbolo)
+                dados_ativo["preço"].append(preco)
+                dados_ativo["variação"].append(variacao)
+                dados_ativo["variação_porcentagem"].append(variacao_porcentagem)
+                dados_ativo["horario"].append(pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))
+                time.sleep(2)
+        except Exception as e:
+            print(f"Erro durante a extração: {e}")    
         salvar_dados(dados_ativo)
