@@ -164,7 +164,7 @@ def iniciar_extracao(caminho_csv, qtd_workers):
             resultados = list(executor.map(extrair_dados, simbolos))
 
         try:
-            reresultados.remove((None, None, None))
+            resultados.remove((None, None, None))
             if len(resultados) == 0:
                 raise ValueError("Nenhum dado válido foi extraído.")
             else:
