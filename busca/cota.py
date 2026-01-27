@@ -12,7 +12,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import interface
 
 def ativos(caminho_csv):
-    #lista_teste_negra = ['NORD3','OIBR3','OSXB3','PEAB3','REDE3','RRIOS','RPAD3','RSID3','SNSY3','SOND3','TKNO3','TRIS3','VVAR3','TOTS3','WIZS3']
+    # lista_teste_negra = ['NORD3','OIBR3','OSXB3','PEAB3','REDE3','RRIOS','RPAD3','RSID3','SNSY3','SOND3','TKNO3','TRIS3','VVAR3','TOTS3','WIZS3']
     path = (pathlib.Path(__file__).parent.resolve()) / 'lista-negra.csv'
     print("Caminho lista negra:", caminho_csv)
     try:
@@ -156,40 +156,39 @@ def iniciar_extracao(caminho_csv, qtd_workers):
         print(f"Erro ao carregar ativos: {e}")
         return
 
-    if os.name == 'nt':
-        
-        inicio = time.time()
-
-        with ThreadPoolExecutor(max_workers=qtd_workers) as executor:
-            resultados = list(executor.map(extrair_dados, simbolos))
-
-        try:
-            resultados.remove((None, None, None))
-            if len(resultados) == 0:
-                raise ValueError("Nenhum dado válido foi extraído.")
-            else:
-                for linha, simbolo in (resultados, simbolos):
-                    if None in linha:
-                        continue
-                    dados_ativo["simbolo"].append(simbolo)
-                    dados_ativo["preco"].append(linha[0])
-                    dados_ativo["variacao"].append(linha[2])
-                    dados_ativo["variacao_porcentagem"].append(linha[1])
-                    dados_ativo["horario"].append(pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))
-        except ValueError:
-            print("Nenhum dado válido foi extraído.")
     
-        print("="*30)
+    inicio = time.time()
 
-        print(f"\nTempo total: {time.time() - inicio:.2f} segundos")
-        
-        try:
-            if len(dados_ativo["simbolo"]) > 0:
-                salvar_dados(dados_ativo)
-            else:
-                print("Nenhum dado válido para salvar.")
-        except:
-            print("Erro ao salvar os dados.")
+    with ThreadPoolExecutor(max_workers=qtd_workers) as executor:
+        resultados = list(executor.map(extrair_dados, simbolos))
+
+    try:
+        resultados.remove((None, None, None))
+        if len(resultados) == 0:
+            raise ValueError("Nenhum dado válido foi extraído.")
+        else:
+            for linha, simbolo in (resultados, simbolos):
+                if None in linha:
+                    continue
+                dados_ativo["simbolo"].append(simbolo)
+                dados_ativo["preco"].append(linha[0])
+                dados_ativo["variacao"].append(linha[2])
+                dados_ativo["variacao_porcentagem"].append(linha[1])
+                dados_ativo["horario"].append(pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))
+    except ValueError:
+        print("Nenhum dado válido foi extraído.")
+
+    print("="*30)
+
+    print(f"\nTempo total: {time.time() - inicio:.2f} segundos")
+    
+    try:
+        if len(dados_ativo["simbolo"]) > 0:
+            salvar_dados(dados_ativo)
+        else:
+            print("Nenhum dado válido para salvar.")
+    except:
+        print("Erro ao salvar os dados.")
     else:
 
         try:
