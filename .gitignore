@@ -2,7 +2,7 @@
 __pychache__/
 
 dado-do-dia/
-monitor.py
+monitor
 .DS_Store
 .env
 .env.local
@@ -22,3 +22,4 @@ monitor.py
 .env.production
 
 
+busca/monitor.py
