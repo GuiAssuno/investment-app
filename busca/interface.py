@@ -16,6 +16,7 @@ class Main:
         self.frame = tk.Frame(root, bg="#f0f0f0", pady=10)
         self.label = tk.Label(root, text="Investment Search App")
         self.label.pack(pady=20)
+        self.simbolos, self.nome, self.black_list = cota.ativos()
 
         # =============================================  ESTILOS ==============================================
         style = ttk.Style()
@@ -182,6 +183,7 @@ class Main:
 
         total = len(cota.ativos())
         for i, ativo in enumerate(ativos_exemplo):
+         
             
             # --- CALLBACK DA BARRA DE PROGRESSO ---
             # Chama a função de atualização da interface
