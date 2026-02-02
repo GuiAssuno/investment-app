@@ -1,11 +1,25 @@
 import tkinter as tk
 from tkinter import ttk
 import webbrowser
-import cota 
+import cota as ct
 import pathlib
 from datetime import datetime
+import pandas as pd
 import threading
 import time
+
+import os
+import time
+import secrets
+import pathlib
+from pathlib import Path
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+from concurrent.futures import ThreadPoolExecutor
+
 
 class Main:
     def __init__(self, root):
@@ -16,7 +30,9 @@ class Main:
         self.frame = tk.Frame(root, bg="#f0f0f0", pady=10)
         self.label = tk.Label(root, text="Investment Search App")
         self.label.pack(pady=20)
-        self.simbolos, self.nome, self.black_list = cota.ativos()
+
+        # Carrega os ativos
+        self.simbolos, self.nome, self.black_list = ct.ativos()
 
         # =============================================  ESTILOS ==============================================
         style = ttk.Style()
@@ -130,13 +146,6 @@ class Main:
         self.label_data.pack(side="right") 
         self.atualizar_relogio() # Inicia o relógio
 
-        # ================================ CARREGANDO ATIVOS ==============================================
-        caminho_csv = pathlib.Path(__file__).parent.resolve().resolve()
-        caminho_csv = caminho_csv / 'lista_tickers' / 'ativos.csv'
-        
-        # Carrega os ativos
-        self.simbolos, self.nomes = cota.ativos(caminho_csv=caminho_csv)
-
     def atualizar_relogio(self):
         """Atualiza o relógio no rodapé"""
         agora = datetime.now().strftime("%d/%m/%Y - %H:%M:%S")
@@ -181,23 +190,69 @@ class Main:
         #    self.root.after(0, self.adicionar_noticia, titulo, link)
         
 
-        total = len(cota.ativos())
-        for i, ativo in enumerate(ativos_exemplo):
+        inicio = time.time()
+
+    # Inicia a extração usando paralelismo para acelerar o o processo de extração
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            resultados = list(executor.map(ct.extrair_dados, self.simbolos)) # Guarda os dados em resultados
+
+        try:
+            # Remove todos os dados que retornou vazio (None)
+            resultados.remove((None, None, None))
+
+            # Verifica se resultados está vazio
+            if len(resultados) == 0:
+                # Envia uma mensagem de Erro em meio da execução
+                raise ValueError("Nenhum dado válido foi extraído.")
+            else:
+                # Extrai os dados de resultados e organiza em um dicionario
+                for linha, simbolo in (resultados, self.simbolos): # Os simbolos são como os id 
+                    
+                    # Verificação adicional para evitar dados vazios (None)
+                    if None in linha: 
+                        continue # Proximo  da fila
+
+                    dados_ativo["simbolo"].append(simbolo)                   #
+                    dados_ativo["preco"].append(linha[0])                    #
+                    dados_ativo["variacao"].append(linha[2])                 #
+                    dados_ativo["variacao_porcentagem"].append(linha[1])     # 
+                    # Guarda o momento em que foi feito a extração
+                    dados_ativo["horario"].append( pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))  
+                
+                
+        except ValueError:
+            print("Nenhum dado válido foi extraído.")
+
+        # print("="*30)
+
+        print(f"\nTempo total: {time.time() - inicio:.2f} segundos")
+        
+        try:
+            # Salva apenas se a lista não estiver vazia
+            if len(dados_ativo["simbolo"]) > 0:
+                ct.salvar_dados(dados_ativo)
+            else:
+                print("Nenhum dado válido para salvar.")
+            return resultados
+        except:
+            print("Erro ao salvar os dados.")
+
+
+
+
+
+        total = len(self.simbolos)
+        for i, ativo in enumerate(self.simbolos):
          
+            extraido = ct.extrair_dados(ativo)
             
             # --- CALLBACK DA BARRA DE PROGRESSO ---
             # Chama a função de atualização da interface
             self.root.after(0, self.atualizar_barra, i+1, total, f"Lendo {ativo}...")
-            
-            # Simulando tempo do Selenium...
-            time.sleep(1.5) 
-            
-            # Simulando dados extraídos
-            import random
-            preco = f"R$ {random.uniform(20, 50):.2f}"
-            var = random.uniform(-2, 2)
-            var_r = f"{var:+.2f}"
-            var_p = f"{var*1.5:+.2f}%"
+
+            preco = f"R$ {extraido[0]:.2f}"
+            var_r = f"{extraido[2]:+.2f}"
+            var_p = f"{extraido[1]:+.2f}%"
 
             # Adiciona na tabela
             self.root.after(0, self.adicionar_acao, ativo, preco, var_r, var_p)
@@ -230,6 +285,55 @@ class Main:
         self.progresso['value'] = porcentagem
         self.status_label.config(text=mensagem)
         self.root.update_idletasks() # Força a interface a desenhar agora
+
+
+    def extrair_dados(cota):
+        driver = ct.configurar_driver() # Configuração de uso e drive do chrome 
+        try:
+            # Site do google finance que atualiza em tempo real
+            driver.get(f"https://www.google.com/finance/quote/{cota}:BVMF")
+
+            # Time é usado aqui para dar um delay esperar a pagina carregar e evitar block
+            time.sleep(4) 
+            if os.name == 'nt':
+                ls = 'Today' #meu sistema é em inglês no windowns
+            else:
+                ls = 'Hoje' #meu sistema é em português no linux
+
+            # Raspa toda a pagina e retorna uma lista das linhas da pagina
+            texto_pagina = driver.find_element(By.TAG_NAME, "body").text
+            # Limpo a "sujeira" dos dados da pagina
+            linhas = texto_pagina.replace(',','.').replace(f' {ls}','').replace('%','').replace('R$','').split('\n')
+            
+            # Breviamente foi feito um teste e assim foi descoberto que as linha que tem as informações de valor são
+            dado_linha_34 = linhas[34] # Preço
+            dado_linha_35 = linhas[35] # Variação
+            dado_linha_36 = linhas[36] # Variação porcentagem
+
+            # print(f"DADOS EXTRAÍDOS DA {cota}: {dado_linha_34}, {dado_linha_35}, {dado_linha_36}")
+
+            # Função para detectar ruidos nas linha 35 e 36
+            if ct.detecta_ruido(dado_linha_35, dado_linha_36, cota):
+                return None
+
+            # print("\n" + "="*10)
+            # print(f"  {cota}  ")
+            # print("="*10)
+            # print(f"R$ {dado_linha_34}")
+            # print(f"   {dado_linha_35}")
+            # print(f"  {dado_linha_36}")
+            # print("="*10 + "\n")
+
+            
+            return dado_linha_34, dado_linha_36, dado_linha_35    
+                
+        except KeyError as e:
+            print(f"Erro extrair dados: {e}")
+            return None, None, None
+        
+        # Caso dê erro na raspagem fecha o navegador para não lotar a memoria
+        finally:
+            driver.quit()
 
 
 if __name__ == "__main__":

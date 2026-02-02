@@ -211,6 +211,8 @@ def iniciar_extracao(simbolos, nomes, quanti_nucleo=4):
                 dados_ativo["variacao_porcentagem"].append(linha[1])     # 
                 # Guarda o momento em que foi feito a extração
                 dados_ativo["horario"].append( pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))  
+            
+            
     except ValueError:
         print("Nenhum dado válido foi extraído.")
 
@@ -224,6 +226,7 @@ def iniciar_extracao(simbolos, nomes, quanti_nucleo=4):
             salvar_dados(dados_ativo)
         else:
             print("Nenhum dado válido para salvar.")
+        return resultados
     except:
         print("Erro ao salvar os dados.")
 
