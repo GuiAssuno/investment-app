@@ -12,5 +12,5 @@ cur.execute("CREATE TABLE ativos (id,empresa,ticker)")
 df = pd.read_csv("/home/lola/VScode/investment-app/banco/esquemas/lista_tickers/ativos.csv")
 df_negra = pd.read_csv("/home/lola/VScode/investment-app/banco/esquemas/lista_tickers/lista_negra")
 
-for 
+
 
