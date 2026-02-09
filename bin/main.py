@@ -1,27 +1,29 @@
-import cota as ct
-import os
-import pathlib
 from pathlib import Path
+import sys
+sys.path.append(str(Path(__file__).parent.parent / 'arq' / 'src'))
+import BuscaDados
+
+import os
 import pandas as pd
 
 # Lista todos os arquivos no diretório atual
-pasta = Path(__file__).parent.resolve()
-print (pasta)
-arquivos = [f for f in pasta.iterdir() if f.is_file()]
+# pasta = Path(__file__).parent.resolve()
+# print (pasta)
+# arquivos = [f for f in pasta.iterdir() if f.is_file()]
 
 #print(arquivos)
 
 # for arquivo in arquivos:
 #     print(arquivo.name)
 # Caminho lista negra
-path = (pathlib.Path(__file__).parent.resolve()) 
-black_list = path / 'lista_tickers' / 'lista-negra.csv'
+# path = (Path(__file__).parent.resolve()) 
+# black_list = path / 'lista_tickers' / 'lista-negra.csv'
 
-# Caminho ativos
-caminho_csv = path / 'lista_tickers' / 'ativos.csv'
+# # Caminho ativos
+# caminho_csv = path / 'lista_tickers' / 'ativos.csv'
 
-print(black_list)
-print (caminho_csv)
+# print(black_list)
+# print (caminho_csv)
 # def carregar (caminho_arquivo = Path(__file__).parent.resolve(),):
 #     caminho_arquivo = Path(__file__).parent.resolve()
 #     quantidade = 1
@@ -49,3 +51,8 @@ print (caminho_csv)
 #             break
 
 
+teste = [        
+        "ITUB4", "VALE3", "PETR4", "WEGE3", "BBAS3", 
+        "MGLU3", "BBDC4", "ABEV3", "PRIO3"]
+
+BuscaDados.salvar_dados((BuscaDados.consulta(teste)))

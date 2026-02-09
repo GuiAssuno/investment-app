@@ -21,6 +21,7 @@ monitor
 .env.test
 .env.production
 
+/home/lola/VScode/investment-app/arq/src/__pycache__/
 
 busca/monitor.py
 busca/analise_padroes.py
