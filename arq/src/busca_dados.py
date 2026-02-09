@@ -16,17 +16,22 @@ def busca_cota():
 
     resposta = requests.get(url)
     conteudo = BeautifulSoup(resposta.content, 'html.parser')
-    
-    c = conteudo.find(class_="ln0Gqe")
-    p = conteudo.find(class_="YMlKec fxKbKc")
-    v = conteudo.find(class_="JwB6zf")
-    q = conteudo.find_all(class_='e1AOyf')
-    print(resposta.status_code) 
-    print (f"{p.text}\n{v.text}\n{q}\n {c.text}")
+    print (type(conteudo))
 
-    for _, linha in enumerate(q):
-        print(f"LINHA[{_}]: {linha.text}")
+    n = conteudo.find(class_="rPF6Lc")
+    c = n.decode_contents()
+
+
+    p = n.find(class_="YMlKec")
+    v = n.find(class_="JwB6zf")
+    q = n.find(class_='P2Luy')
+    print(resposta.status_code) 
+    print (f"{p.text}\n{v}\n{q}\n")
+
+    print(n)
+    
+    for _, linha in enumerate(n):
+        print(f"LINHA[{_}]: {linha}")
 
 if __name__ == "__main__":
     busca_cota()
-    #test()
