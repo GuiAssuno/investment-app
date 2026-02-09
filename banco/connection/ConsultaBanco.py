@@ -5,8 +5,8 @@ import pandas as pd
 def consultar_banco (caminho_banco= None):
     if caminho_banco is None:
         path = Path(__file__).parent.parent.parent.resolve()
-        caminho_banco = path / 'data' / 'Investimento.db'
-
+        caminho_banco = path / 'banco' / 'data' / 'Investimento.db'
+        print(caminho_banco)
     con = sqlite3.connect(caminho_banco)
     comando = "SELECT * FROM ativos"
 

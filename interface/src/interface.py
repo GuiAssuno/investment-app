@@ -1,24 +1,23 @@
 import tkinter as tk
 from tkinter import ttk
-import webbrowser
-import cota as ct
-import pathlib
 from datetime import datetime
 import pandas as pd
 import threading
 import time
-
 import os
 import time
-import secrets
-import pathlib
+import webbrowser
 from pathlib import Path
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from concurrent.futures import ThreadPoolExecutor
+import sys
+sys.path.append(str(Path(__file__).parent.parent.parent.resolve() / 'arq' / 'src'))
+import funcoes
+
+# from selenium import webdriver
+# from selenium.webdriver.common.by import By
+# from selenium.webdriver.chrome.service import Service
+# from selenium.webdriver.chrome.options import Options
+# from webdriver_manager.chrome import ChromeDriverManager
+# from concurrent.futures import ThreadPoolExecutor
 
 
 class Main:
@@ -30,9 +29,6 @@ class Main:
         self.frame = tk.Frame(root, bg="#f0f0f0", pady=10)
         self.label = tk.Label(root, text="Investment Search App")
         self.label.pack(pady=20)
-
-        # Carrega os ativos
-        self.simbolos, self.nome, self.black_list = ct.ativos()
 
         # =============================================  ESTILOS ==============================================
         style = ttk.Style()
@@ -152,6 +148,23 @@ class Main:
         self.label_data.config(text=f"{agora}")
         self.root.after(1000, self.atualizar_relogio)
 
+    def adiciona_noticia(self, tempo=100000):
+        """Atualiza a barra de noticias automaticamente a cada um intervalo"""
+
+        for widget in self.frame_interno_news.winfo_children(): # Limpa noticias
+            widget.destroy()
+
+        noticias = funcoes.buscar_noticia()
+        
+        for titulo, link in noticias:    
+            lbl = tk.Label(self.frame_interno_news, text=f"• {titulo}", 
+                        fg="blue", cursor="hand2", font=("Arial", 10, "underline"), wraplength=280, justify="left")
+            lbl.pack(anchor="w", pady=5, padx=5)
+            # Evento de clique
+            lbl.bind("<Button-1>", lambda e: webbrowser.open_new(link))
+            
+        self.root.after(tempo, self.adiciona_noticia)
+
     def buscar_investimentos(self):
         """Inicia a thread para não travar a tela"""
 
@@ -162,112 +175,9 @@ class Main:
         #    widget.destroy()
         
         # Inicia a thread para trabalhar em segundo plano
-        t = threading.Thread(target=self.processo_de_busca) 
+        t = threading.Thread(target= funcoes.processo_de_busca) 
         t.start()
-
-    def processo_de_busca(self):
-        
-        dados_ativo = {
-            "simbolo": [],
-            "preço": [],
-            "variação": [],
-            "variação_porcentagem": [],
-            "horario": []
-            }
-        
-        # Simulando Ativos
-        ativos_exemplo = ["ITUB3", "VALE3", "PETR4", "MGLU3", "WEGE3"]
-        
-        # Simulando Notícias
-        #noticias_fake = [
-        #    ("Dólar cai para R$ 4,90 com otimismo externo", "https://google.com"),
-        #    ("Bolsa sobe 1% puxada por bancos", "https://uol.com.br"),
-        #    ("Inflação desacelera em janeiro", "https://g1.globo.com")
-        #]
-        
-        #for titulo, link in noticias_fake: 
-        #    # Usamos after para mexer na interface de dentro da thread
-        #    self.root.after(0, self.adicionar_noticia, titulo, link)
-        
-
-        inicio = time.time()
-
-    # Inicia a extração usando paralelismo para acelerar o o processo de extração
-        with ThreadPoolExecutor(max_workers=6) as executor:
-            resultados = list(executor.map(ct.extrair_dados, self.simbolos)) # Guarda os dados em resultados
-
-        try:
-            # Remove todos os dados que retornou vazio (None)
-            resultados.remove((None, None, None))
-
-            # Verifica se resultados está vazio
-            if len(resultados) == 0:
-                # Envia uma mensagem de Erro em meio da execução
-                raise ValueError("Nenhum dado válido foi extraído.")
-            else:
-                # Extrai os dados de resultados e organiza em um dicionario
-                for linha, simbolo in (resultados, self.simbolos): # Os simbolos são como os id 
-                    
-                    # Verificação adicional para evitar dados vazios (None)
-                    if None in linha: 
-                        continue # Proximo  da fila
-
-                    dados_ativo["simbolo"].append(simbolo)                   #
-                    dados_ativo["preco"].append(linha[0])                    #
-                    dados_ativo["variacao"].append(linha[2])                 #
-                    dados_ativo["variacao_porcentagem"].append(linha[1])     # 
-                    # Guarda o momento em que foi feito a extração
-                    dados_ativo["horario"].append( pd.Timestamp.now().strftime('%d/%m/%Y - %H:%M:%S'))  
-                
-                
-        except ValueError:
-            print("Nenhum dado válido foi extraído.")
-
-        # print("="*30)
-
-        print(f"\nTempo total: {time.time() - inicio:.2f} segundos")
-        
-        try:
-            # Salva apenas se a lista não estiver vazia
-            if len(dados_ativo["simbolo"]) > 0:
-                ct.salvar_dados(dados_ativo)
-            else:
-                print("Nenhum dado válido para salvar.")
-            return resultados
-        except:
-            print("Erro ao salvar os dados.")
-
-
-
-
-
-        total = len(self.simbolos)
-        for i, ativo in enumerate(self.simbolos):
-         
-            extraido = ct.extrair_dados(ativo)
-            
-            # --- CALLBACK DA BARRA DE PROGRESSO ---
-            # Chama a função de atualização da interface
-            self.root.after(0, self.atualizar_barra, i+1, total, f"Lendo {ativo}...")
-
-            preco = f"R$ {extraido[0]:.2f}"
-            var_r = f"{extraido[2]:+.2f}"
-            var_p = f"{extraido[1]:+.2f}%"
-
-            # Adiciona na tabela
-            self.root.after(0, self.adicionar_acao, ativo, preco, var_r, var_p)
-
-        self.root.after(0, self.atualizar_barra, 100, 100, "Concluído!")
-        self.progresso.pack_forget()  # Esconde a barra de progresso
-
-    def adicionar_noticia(self, titulo, url):
-        """Cria um link clicável no painel de notícias"""
-        lbl = tk.Label(self.frame_interno_news, text=f"• {titulo}", 
-                       fg="blue", cursor="hand2", font=("Arial", 10, "underline"), wraplength=280, justify="left")
-        lbl.pack(anchor="w", pady=5, padx=5)
-        # Evento de clique
-        lbl.bind("<Button-1>", lambda e: webbrowser.open_new(url))
-
+    
     def adicionar_acao(self, ativo, preco, var_reais, var_porcent):
         """Adiciona uma linha na tabela com a cor certa"""
         # Limpa formatação de texto para verificar se é positivo ou negativo
@@ -286,57 +196,11 @@ class Main:
         self.status_label.config(text=mensagem)
         self.root.update_idletasks() # Força a interface a desenhar agora
 
-
-    def extrair_dados(cota):
-        driver = ct.configurar_driver() # Configuração de uso e drive do chrome 
-        try:
-            # Site do google finance que atualiza em tempo real
-            driver.get(f"https://www.google.com/finance/quote/{cota}:BVMF")
-
-            # Time é usado aqui para dar um delay esperar a pagina carregar e evitar block
-            time.sleep(4) 
-            if os.name == 'nt':
-                ls = 'Today' #meu sistema é em inglês no windowns
-            else:
-                ls = 'Hoje' #meu sistema é em português no linux
-
-            # Raspa toda a pagina e retorna uma lista das linhas da pagina
-            texto_pagina = driver.find_element(By.TAG_NAME, "body").text
-            # Limpo a "sujeira" dos dados da pagina
-            linhas = texto_pagina.replace(',','.').replace(f' {ls}','').replace('%','').replace('R$','').split('\n')
-            
-            # Breviamente foi feito um teste e assim foi descoberto que as linha que tem as informações de valor são
-            dado_linha_34 = linhas[34] # Preço
-            dado_linha_35 = linhas[35] # Variação
-            dado_linha_36 = linhas[36] # Variação porcentagem
-
-            # print(f"DADOS EXTRAÍDOS DA {cota}: {dado_linha_34}, {dado_linha_35}, {dado_linha_36}")
-
-            # Função para detectar ruidos nas linha 35 e 36
-            if ct.detecta_ruido(dado_linha_35, dado_linha_36, cota):
-                return None
-
-            # print("\n" + "="*10)
-            # print(f"  {cota}  ")
-            # print("="*10)
-            # print(f"R$ {dado_linha_34}")
-            # print(f"   {dado_linha_35}")
-            # print(f"  {dado_linha_36}")
-            # print("="*10 + "\n")
-
-            
-            return dado_linha_34, dado_linha_36, dado_linha_35    
-                
-        except KeyError as e:
-            print(f"Erro extrair dados: {e}")
-            return None, None, None
-        
-        # Caso dê erro na raspagem fecha o navegador para não lotar a memoria
-        finally:
-            driver.quit()
-
-
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = Main(root)
-    root.mainloop()
+    # root = tk.Tk()
+    # app = Main(root)
+    # root.mainloop()
+
+    '/home/lola/VScode/investment-app/arq/src/funcoes.py'
+    '/home/lola/VScode/investment-app/arq/src'
+    print()
