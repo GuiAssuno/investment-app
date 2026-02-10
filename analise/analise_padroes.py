@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 # Configuração
-caminho = Path(__file__).parent.resolve()
+caminho = Path(__file__).parent.parent
 print(caminho)
-PASTA_DADOS = caminho / 'dado-do-dia' #"busca/dado-do-dia" # Nome da sua pasta 
+PASTA_DADOS = caminho /'banco' / 'arquivos' / 'dado-do-dia' #"busca/dado-do-dia" # Nome da sua pasta 
 ARQUIVO_SAIDA_SEQUENCIAL = "analise_sequencial.csv"
 ARQUIVO_SAIDA_HORARIO = "analise_horario.csv"
 
@@ -19,7 +19,7 @@ def ler_csv_flexivel(caminho_arquivo):
     for enc in encodings:
         for sep in separadores:
             try:
-                df = pd.read_csv(caminho_arquivo, sep=sep, encoding=enc)
+                df = pd.read_json(caminho_arquivo, sep=sep, encoding=enc)
                 # Teste básico: se leu só 1 coluna, provavelmente o separador está errado
                 if df.shape[1] > 1:
                     return df

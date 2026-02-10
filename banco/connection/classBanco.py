@@ -14,13 +14,15 @@ class BaDa:
     
         try:
             con = sqlite3.connect(self.path)
-            comando = f"SELECT * FROM ativos" 
-            df_tabela = pd.read_sql_query(comando, con) 
+            cursor = con.cursor()
+            cursor.execute("SELECT ticker FROM ativos")
+            # List comprehension rápida e nativa, sem Pandas
+            resultado = [linha[0] for linha in cursor.fetchall()]
             con.close()
-            return list(df_tabela['ticker'])
-
+            return resultado
         except Exception as e:
-            return e
+            print(f"Erro no banco: {e}")
+            return []
     
 
     def criar_tabela(self):
