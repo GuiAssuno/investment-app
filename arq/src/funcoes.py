@@ -75,22 +75,6 @@ def processo_de_busca():
     print("Sem Problemas")
     return df_final
 
-    total = len(simbolos)
-    for i, ativo in enumerate(simbolos):
-        
-        extraido = ct.extrair_dados(ativo)
-        
-        # --- CALLBACK DA BARRA DE PROGRESSO ---
-        # Chama a função de atualização da interface
-        root.after(0, atualizar_barra, i+1, total, f"Lendo {ativo}...")
-
-        preco = f"R$ {extraido[0]:.2f}"
-        var_r = f"{extraido[2]:+.2f}"
-        var_p = f"{extraido[1]:+.2f}%"
-
-        # Adiciona na tabela
-        root.after(0, adicionar_acao, ativo, preco, var_r, var_p)
-
 def busca_noticia():
     links = {
         "https://investnews.com.br/economia/page/540/?_gl=1%2Ali6itt%2Agclid%2AQ2p3S0NBanctYi1rQmhCLUVpd0E0ZnZLckVuMS1NV1lpRWswLTJWalpSbURoX2tGTU43b3dWQXpKNE1tc3V0SnBMZkhKN3FzNXRESm1Cb0NELXNRQXZEX0J3RQ..%2A_gcl_aw%2AR0NMLjE2ODcyODU1NzIuQ2p3S0NBanctYi1rQmhCLUVpd0E0ZnZLckVuMS1NV1lpRWswLTJWalpSbURoX2tGTU43b3dWQXpKNE1tc3V0SnBMZkhKN3FzNXRESm1Cb0NELXNRQXZEX0J3RQ..&noamp=mobile&gad_source=1&gad_campaignid=17459268635&gclid=CjwKCAiAqKbMBhBmEiwAZ3UboPjtNpeA1nAIdZIkw3sKxjCBLdy0mo8WZ4oz3Hjq9ft6ih084H4oeRoC_ncQAvD_BwE": ["category-posts-content","h2"],
@@ -200,4 +184,5 @@ def salvar_dados(arquivo):
 
 if __name__ == "__main__":
     i = 0
-    #df = processo_de_busca()
+    df = processo_de_busca()
+    print(df)
