@@ -18,9 +18,8 @@ def configurar_driver():
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--window-size=1920,1080")
-    chrome_options.add_argument("--log-level=3") # Menos avisos no terminal
+    chrome_options.add_argument("--log-level=3") 
     
-    # Otimização para bloquear imagens (Carrega mais rápido)
     prefs = {"profile.managed_default_content_settings.images": 2}
     chrome_options.add_experimental_option("prefs", prefs)
     
@@ -35,8 +34,7 @@ def extrair_dados(cota):
 
         driver = configurar_driver()
         driver.get(f"https://www.google.com/finance/quote/{cota}:BVMF")
-        
-        # Espera carregar (segurança)
+
         time.sleep(4) 
         texto_pagina = driver.find_element(By.TAG_NAME, "body").text
         linhas = texto_pagina.split('\n')
