@@ -16,7 +16,7 @@ def migrar_dados():
     except:
         print("Erro ao carregar caminho dos arquivos")
      
-    # 2. Carregar Arquivos
+    # Carregar Arquivos
     try:
         df = pd.read_csv(CSV_ATIVOS)
 
@@ -55,11 +55,11 @@ def migrar_dados():
         con = sqlite3.connect(ARQUIVO_DB)
         cur = con.cursor()
         
-        # Cria a tabela SE NÃO EXISTIR
-        # id INTEGER PRIMARY KEY AUTOINCREMENT cria um id automatico
+        # SE NÃO EXISTIR cria a tabela 
+        # cria um id automatico
         cur.execute("""
             CREATE TABLE IF NOT EXISTS ativos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT, 
                 ticker TEXT UNIQUE,
                 nome TEXT
             )
