@@ -67,9 +67,9 @@ def salvar_dados(arquivo):
 
     arquivo.to_json(
         nome_arquivo, 
-        orient="records",   # Cria uma lista de objetos [{...}, {...}] (Mais comum)
-        indent=4,           # Deixa o JSON bonitinho e legível (identado)
-        force_ascii=False   # Permite acentos e R$ (não transforma em códigos estranhos)
+        orient="records",   # Cria uma lista de objetoS
+        indent=4,           # Deixa o JSON legível 
+        force_ascii=False   # Permite acentos 
     )
     
     print(f"\nArquivo salvo com sucesso em: {os.path.abspath(nome_arquivo)}")
