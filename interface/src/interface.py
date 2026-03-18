@@ -49,11 +49,11 @@ class Main:
        # ========================================= ADICIONANDO PAINEIS ========================================
         
         # Painel Mestre 
-        self.painel_mestre = ttk.PanedWindow(orient=tk.HORIZONTAL)# orient=HORIZONTAL significa: coloque um ao lado do outro
+        self.painel_mestre = ttk.PanedWindow(orient=tk.HORIZONTAL)# orient=HORIZONTAL = coloque um ao lado do outro
         self.painel_mestre.pack(fill="both", expand=True, padx=5, pady=5)
 
         #  Painel esquerdo
-        self.painel_esquerdo = ttk.PanedWindow(orient=tk.VERTICAL) # orient=VERTICAL significa: coloque um em cima do outro
+        self.painel_esquerdo = ttk.PanedWindow(orient=tk.VERTICAL) # orient=VERTICAL = coloque um em cima do outro
         
         # Adicionamos ele ao mestre ai Ele entra na esquerda pq é o primeiro a entrar
         self.painel_mestre.add(self.painel_esquerdo, weight=3) # weight=3 dá mais espaço para o conteúdo principal
@@ -74,7 +74,7 @@ class Main:
         # Adicionado na parte de cima do painel esquerdo
         self.painel_esquerdo.add(self.frame_conteudo_topo, weight=2)
 
-        # Inferior Esquerda (Notícias)
+        # Inferior Esquerda 
         self.frame_noticias = tk.LabelFrame(self.painel_esquerdo, text=" Notícias ")
         
         # Adiciona na parte de baixo do painel esquerdo
@@ -96,7 +96,7 @@ class Main:
         self.canvas_news.pack(side="left", fill="both", expand=True) #
         self.scroll_news.pack(side="right", fill="y") # 
 
-        # ============================ PREENCHEMOS A COLUNA DA DIREITA (Cotações) =============================
+        # ============================ PREENCHEMOS A COLUNA DA DIREITA =============================
         
        # Criando Tabela (Treeview)
         colunas = ("ativo", "preco", "var_reais", "var_porcent")
